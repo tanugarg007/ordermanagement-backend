@@ -32,13 +32,29 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const deliveryAddressSchema = new mongoose_1.Schema({
+    name: { type: String, required: true, trim: true, maxlength: 80 },
+    state: { type: String, required: true, trim: true, maxlength: 80 },
+    city: { type: String, required: true, trim: true, maxlength: 80 },
+    phoneNumber: { type: String, required: true, match: /^\d{10}$/ },
+    pincode: { type: String, required: true, match: /^\d{6}$/ },
+    address: { type: String, required: true, trim: true, maxlength: 300 },
+    houseNumber: { type: String, required: true, trim: true, maxlength: 80 },
+}, { _id: false });
 const userSchema = new mongoose_1.Schema({
     name: {
         type: String,
         required: true,
         trim: true,
+        minlength: 2,
+        maxlength: 80,
     },
     email: {
         type: String,
@@ -46,13 +62,55 @@ const userSchema = new mongoose_1.Schema({
         unique: true,
         trim: true,
         lowercase: true,
+        match: [
+            /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/,
+            "Please provide a valid email",
+        ],
     },
     password: {
         type: String,
         required: true,
+        minlength: 6,
+        maxlength: 256,
+    },
+    role: {
+        type: String,
+        enum: ["user", "admin"],
+        default: "user",
+    },
+    deliveryAddress: {
+        type: deliveryAddressSchema,
+        default: undefined,
     },
 }, {
     timestamps: true,
+});
+userSchema.pre("save", async function () {
+    if (!this.isModified("password")) {
+        return;
+    }
+    const salt = await bcryptjs_1.default.genSalt(12);
+    this.password = await bcryptjs_1.default.hash(this.password, salt);
+});
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    return bcryptjs_1.default.compare(candidatePassword, this.password);
+};
+userSchema.methods.generateJWT = function () {
+    const payload = { id: String(this._id), email: this.email };
+    const secret = process.env.JWT_SECRET || "change_me";
+    const options = {
+        expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    };
+    return jsonwebtoken_1.default.sign(payload, secret, options);
+};
+userSchema.set("toJSON", {
+    transform: (_doc, ret) => {
+        if ("password" in ret)
+            delete ret.password;
+        if ("__v" in ret)
+            delete ret.__v;
+        return ret;
+    },
 });
 const User = mongoose_1.default.model("User", userSchema);
 exports.default = User;

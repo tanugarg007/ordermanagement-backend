@@ -1,15 +1,26 @@
-import mongoose, { Document } from "mongoose";
-interface IUser extends Document {
+import { Document, Model } from "mongoose";
+export interface IUser extends Document {
     name: string;
     email: string;
     password: string;
+    role: "user" | "admin";
+    deliveryAddress?: {
+        name: string;
+        state: string;
+        city: string;
+        phoneNumber: string;
+        pincode: string;
+        address: string;
+        houseNumber: string;
+    };
+    comparePassword(candidatePassword: string): Promise<boolean>;
+    generateJWT(): string;
 }
-declare const User: mongoose.Model<IUser, {}, {}, {}, mongoose.Document<unknown, {}, IUser, {}, mongoose.DefaultSchemaOptions> & IUser & Required<{
-    _id: mongoose.Types.ObjectId;
-}> & {
-    __v: number;
-} & {
-    id: string;
-}, any, IUser>;
+interface IUserMethods {
+    comparePassword(candidatePassword: string): Promise<boolean>;
+    generateJWT(): string;
+}
+type TUserModel = Model<IUser, {}, IUserMethods>;
+declare const User: TUserModel;
 export default User;
 //# sourceMappingURL=usermodel.d.ts.map
