@@ -1,16 +1,13 @@
+import "dotenv/config";
 import express, { ErrorRequestHandler } from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-import mongoose from "mongoose";
-import Router from "./router/approuter";
+import Router from "./routes/app";
 import { UPLOAD_ABSOLUTE_DIR } from "./middleware/upload";
-
-dotenv.config();
+import { connectDatabase } from "./config/database";
 
 const app = express();
 
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || "";
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
@@ -33,8 +30,12 @@ app.get("/", (_req, res) => {
     endpoints: {
       health: "GET /api/health",
       auth: {
-        register: "POST /api/register { name, email, password, role }",
+        register: "POST /users/register { name, email, password } (customer accounts only)",
         login: "POST /api/login { email, password }",
+        staffUsers: "GET /users/staff [SuperAdmin]",
+        createStaff:
+          "POST /users/user { name, email, password, role: superadmin|inventory } [SuperAdmin]",
+        staffRoles: "SuperAdmin has full dashboard access; Inventory can manage products and stock.",
         deliveryAddress: "PATCH /users/me/delivery-address [authenticated]",
         me: "GET /api/me [Bearer <token>]",
         users: "GET /api/users [Bearer <token>]",
@@ -67,8 +68,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 };
 app.use(errorHandler);
 
-mongoose
-  .connect(MONGO_URI)
+connectDatabase()
   .then(() => {
     console.log("Connected to MongoDB");
 
@@ -81,4 +81,5 @@ mongoose
   })
   .catch((error) => {
     console.error("MongoDB connection failed:", error);
+    process.exitCode = 1;
   });

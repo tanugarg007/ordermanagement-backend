@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createUser = exports.getAllUsers = exports.saveDeliveryAddress = exports.deleteMyAccount = exports.getProfile = exports.loginUser = exports.registerUser = void 0;
+exports.createUser = exports.getStaffUsers = exports.getAllUsers = exports.saveDeliveryAddress = exports.deleteMyAccount = exports.getProfile = exports.loginUser = exports.createStaffUser = exports.registerUser = void 0;
 const usermodel_1 = __importDefault(require("../models/usermodel"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const orderlistmodel_1 = require("../models/orderlistmodel");
@@ -23,24 +23,24 @@ const registerUser = async (req, res) => {
                 .status(400)
                 .json({ message: "Name, email and password are required" });
         }
-        const requestedRole = role ?? "user";
-        if (requestedRole !== "user" && requestedRole !== "admin") {
-            return res.status(400).json({ message: "Role must be user or admin." });
+        if (role !== undefined && role !== "user") {
+            return res.status(400).json({ message: "Public registration is only available for customer accounts." });
         }
         if (password.length < 6) {
             return res
                 .status(400)
                 .json({ message: "Password must be at least 6 characters long" });
         }
-        const existing = await usermodel_1.default.findOne({ email });
+        const normalizedEmail = email.trim().toLowerCase();
+        const existing = await usermodel_1.default.findOne({ email: normalizedEmail });
         if (existing) {
             return res.status(409).json({ message: "Email already exists" });
         }
         const user = await usermodel_1.default.create({
-            name,
-            email,
+            name: name.trim(),
+            email: normalizedEmail,
             password,
-            role: requestedRole,
+            role: "user",
         });
         return res.status(201).json(buildUserResponse(user));
     }
@@ -55,6 +55,56 @@ const registerUser = async (req, res) => {
     }
 };
 exports.registerUser = registerUser;
+const createStaffUser = async (req, res) => {
+    try {
+        const { name, email, password, role } = req.body;
+        if (typeof name !== "string" ||
+            !name.trim() ||
+            typeof email !== "string" ||
+            !email.trim() ||
+            typeof password !== "string" ||
+            !password) {
+            return res.status(400).json({
+                message: "Name, email, password and role are required.",
+            });
+        }
+        if (role !== "superadmin" && role !== "inventory") {
+            return res.status(400).json({
+                message: "Role must be superadmin or inventory.",
+            });
+        }
+        if (password.length < 6) {
+            return res.status(400).json({
+                message: "Password must be at least 6 characters long",
+            });
+        }
+        const normalizedEmail = email.trim().toLowerCase();
+        const existing = await usermodel_1.default.findOne({ email: normalizedEmail });
+        if (existing) {
+            return res.status(409).json({ message: "Email already exists" });
+        }
+        const user = await usermodel_1.default.create({
+            name: name.trim(),
+            email: normalizedEmail,
+            password,
+            role,
+        });
+        return res.status(201).json({
+            message: "Staff account created successfully.",
+            user: user.toJSON(),
+        });
+    }
+    catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({ message: "Email already exists" });
+        }
+        return res.status(500).json({
+            message: "Error creating staff account",
+            error: error.message,
+        });
+    }
+};
+exports.createStaffUser = createStaffUser;
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -210,7 +260,9 @@ const saveDeliveryAddress = async (req, res) => {
 exports.saveDeliveryAddress = saveDeliveryAddress;
 const getAllUsers = async (_req, res) => {
     try {
-        const users = await usermodel_1.default.find().select("-password -__v").sort({ createdAt: -1 });
+        const users = await usermodel_1.default.find({ role: "user" })
+            .select("-password -__v")
+            .sort({ createdAt: -1 });
         return res.status(200).json({ count: users.length, users });
     }
     catch (error) {
@@ -221,5 +273,20 @@ const getAllUsers = async (_req, res) => {
     }
 };
 exports.getAllUsers = getAllUsers;
-exports.createUser = exports.registerUser;
+const getStaffUsers = async (_req, res) => {
+    try {
+        const users = await usermodel_1.default.find({ role: { $in: ["admin", "superadmin", "inventory"] } })
+            .select("-password -__v")
+            .sort({ createdAt: -1 });
+        return res.status(200).json({ count: users.length, users });
+    }
+    catch (error) {
+        return res.status(500).json({
+            message: "Error fetching staff accounts",
+            error: error.message,
+        });
+    }
+};
+exports.getStaffUsers = getStaffUsers;
+exports.createUser = exports.createStaffUser;
 //# sourceMappingURL=user.js.map

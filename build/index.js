@@ -3,21 +3,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+require("dotenv/config");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
-const dotenv_1 = __importDefault(require("dotenv"));
-const mongoose_1 = __importDefault(require("mongoose"));
-const approuter_1 = __importDefault(require("./router/approuter"));
+const app_1 = __importDefault(require("./routes/app"));
 const upload_1 = require("./middleware/upload");
-dotenv_1.default.config();
+const database_1 = require("./config/database");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || "";
 app.use((0, cors_1.default)());
 app.use(express_1.default.json({ limit: "10mb" }));
 app.use(express_1.default.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express_1.default.static(upload_1.UPLOAD_ABSOLUTE_DIR));
-app.use("/users", approuter_1.default);
+app.use("/users", app_1.default);
 app.post("/test", (req, res) => {
     res.json({
         message: "POST route is working",
@@ -30,8 +28,11 @@ app.get("/", (_req, res) => {
         endpoints: {
             health: "GET /api/health",
             auth: {
-                register: "POST /api/register { name, email, password, role }",
+                register: "POST /users/register { name, email, password } (customer accounts only)",
                 login: "POST /api/login { email, password }",
+                staffUsers: "GET /users/staff [SuperAdmin]",
+                createStaff: "POST /users/user { name, email, password, role: superadmin|inventory } [SuperAdmin]",
+                staffRoles: "SuperAdmin has full dashboard access; Inventory can manage products and stock.",
                 deliveryAddress: "PATCH /users/me/delivery-address [authenticated]",
                 me: "GET /api/me [Bearer <token>]",
                 users: "GET /api/users [Bearer <token>]",
@@ -60,8 +61,7 @@ const errorHandler = (err, _req, res, _next) => {
     return res.status(500).json({ message: msg });
 };
 app.use(errorHandler);
-mongoose_1.default
-    .connect(MONGO_URI)
+(0, database_1.connectDatabase)()
     .then(() => {
     console.log("Connected to MongoDB");
     app.listen(Number(PORT), () => {
@@ -71,5 +71,6 @@ mongoose_1.default
 })
     .catch((error) => {
     console.error("MongoDB connection failed:", error);
+    process.exitCode = 1;
 });
 //# sourceMappingURL=index.js.map

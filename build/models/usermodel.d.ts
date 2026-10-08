@@ -1,9 +1,10 @@
 import { Document, Model } from "mongoose";
+export type UserRole = "user" | "admin" | "superadmin" | "inventory";
 export interface IUser extends Document {
     name: string;
     email: string;
     password: string;
-    role: "user" | "admin";
+    role: UserRole;
     deliveryAddress?: {
         name: string;
         state: string;
